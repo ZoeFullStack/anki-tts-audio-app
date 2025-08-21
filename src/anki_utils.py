@@ -1,3 +1,7 @@
+def format_anki_sound(audio_filename: str) -> str:
+    """Wraps the filename in [sound:...] for Anki audio fields."""
+    return f"[sound:{audio_filename}]"
+
 from typing import List, Dict
 import requests
 import json
@@ -27,6 +31,9 @@ def get_note_fields(note_id: int) -> Dict:
     return {}
 
 def update_note_field(note_id: int, field_name: str, updated_content: str) -> None:
+    # If the content looks like a filename (endswith .mp3 or .wav), wrap it for Anki
+    if isinstance(updated_content, str) and (updated_content.endswith('.mp3') or updated_content.endswith('.wav')):
+        updated_content = format_anki_sound(updated_content)
     payload = {
         "action": "updateNoteFields",
         "version": 6,
@@ -39,7 +46,9 @@ def update_note_field(note_id: int, field_name: str, updated_content: str) -> No
             }
         },
     }
+    print("[ANKI UPDATE] Payload:", json.dumps(payload, ensure_ascii=False, indent=2))
     response = requests.post(ANKI_CONNECT_URL, json=payload)
+    print("[ANKI UPDATE] Response:", response.text)
     result = response.json()
     if result.get("error") is None:
         print(f"Updated note_id={note_id}, field={field_name}, new content={updated_content}")
