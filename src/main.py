@@ -46,6 +46,12 @@ def main():
         fields = get_note_fields(note_id)
         text_to_convert = fields.get(SOURCE_FIELD, {}).get("value", "")
         
+        existing_audio = fields.get(TARGET_FIELD, {}).get("value", "")
+        
+        if existing_audio.strip():
+            print(f"Skipping note ID {note_id} - already has audio: {existing_audio}")
+            continue
+        
         if text_to_convert:
             audio_file_name = generate_audio_filename(text_to_convert)
             audio_file_path = os.path.join(AUDIO_OUTPUT_DIR, audio_file_name)
