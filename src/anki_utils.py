@@ -5,10 +5,11 @@ import json
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
 
 def get_notes(deck_name: str) -> List[int]:
+    escaped_deck_name = deck_name.replace('"', r'\"')
     payload = {
         "action": "findNotes",
         "version": 6,
-        "params": {"query": f"deck:{deck_name}"}
+        "params": {"query": f'deck:"{escaped_deck_name}"'}
     }
     response = requests.post(ANKI_CONNECT_URL, json=payload)
     result = response.json()
