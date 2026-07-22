@@ -1,0 +1,294 @@
+<div id="front-card" class="card-content">
+    {{#正面}}
+        <div id="audio-container"></div>
+
+        <label>播放时间（秒）：</label>
+        <input type="number" id="playTime" value="3">
+
+        <label>暂停时间（秒）：</label>
+        <input type="number" id="pauseTime" value="4">
+
+        <label>倒退时间（秒）：</label>
+        <input type="number" id="reverseTime" value="1">
+
+        <button id="startPause">开始自动暂停</button>
+        <button id="stopPause">停止</button>
+        <button id="reversePlay">倒放</button>
+        <button id="loopToggle">循环播放</button>
+        <button id="normalPlay">正常播放</button> <!-- 新增按钮 -->
+    {{/正面}}
+</div>
+
+<style>
+    input, button, label, audio {
+        display: block;
+        margin-top: 10px;
+    }
+</style>
+
+<script>
+    // 全局变量初始化
+    window.audio = null;
+    window.pauseInterval = null;
+    window.isPausedManually = false;
+    window.playDuration = null;
+    window.pauseDuration = null;
+    window.audioSessionId = null; // 用于标识当前音频会话
+
+    function initializeAudio() {
+        console.log(`[${new Date().toLocaleTimeString()}] Initializing audio...`);
+
+        // 清除旧的计时器
+        if (window.pauseInterval) {
+            clearTimeout(window.pauseInterval);
+            window.pauseInterval = null; // 重置计时器
+        }
+
+        // 确保旧的音频实例被清除
+        if (window.audio) {
+            window.audio.pause();
+            window.audio.remove();
+            window.audio = null; // 重置音频实例
+        }
+
+        let audioContainer = document.getElementById("audio-container");
+
+        let newAudio = document.createElement("audio");
+        newAudio.id = "myAudio";
+        newAudio.controls = true;
+        newAudio.autoplay = true; // 切换卡片时自动播放
+        newAudio.loop = true; // 默认开启循环播放
+
+        let source = document.createElement("source");
+        source.src = "{{正面}}"; // 替换为实际音频文件的 URL
+        source.type = "audio/mpeg";
+
+        newAudio.appendChild(source);
+        audioContainer.appendChild(newAudio);
+
+        // 更新全局音频实例
+        window.audio = newAudio;
+
+        // 更新音频会话 ID
+        window.audioSessionId = Date.now(); // 使用时间戳作为唯一标识符
+
+        // 重置全局变量
+        window.isPausedManually = false;
+
+        // 添加事件监听器
+        addListeners();
+
+        // 初始化按钮状态
+        updateButtonStates();
+    }
+
+    function addListeners() {
+        if (!window.audio) {
+            console.error("音频未初始化！");
+            return;
+        }
+        document.getElementById("startPause").addEventListener("click", pauseEveryCustom);
+        document.getElementById("stopPause").addEventListener("click", stopAutoPause);
+        document.getElementById("reversePlay").addEventListener("click", toggleReverse);
+        document.getElementById("loopToggle").addEventListener("click", toggleLoop);
+        document.getElementById("normalPlay").addEventListener("click", normalPlay); // 新增事件监听器
+
+        // 确保页面加载完成后启动自动暂停
+        pauseEveryCustom();
+    }
+
+    function updateButtonStates() {
+        // 更新循环播放按钮状态
+        const loopButton = document.getElementById("loopToggle");
+        if (window.audio && window.audio.loop) {
+            loopButton.innerText = "循环播放（已开）";
+        } else {
+            loopButton.innerText = "循环播放（已关）";
+        }
+
+        // 更新自动暂停按钮状态
+        const pauseButton = document.getElementById("startPause");
+        if (window.pauseInterval) {
+            pauseButton.innerText = "自动暂停（已开）";
+        } else {
+            pauseButton.innerText = "自动暂停（已关）";
+        }
+    }
+
+    function pauseEveryCustom() {
+        if (!window.audio) return;
+
+        // 获取播放时间和暂停时间
+        window.playDuration = parseFloat(document.getElementById("playTime").value) * 1000;
+        window.pauseDuration = parseFloat(document.getElementById("pauseTime").value) * 1000;
+
+        // 清除旧的计时器
+        if (window.pauseInterval) {
+            clearTimeout(window.pauseInterval);
+            window.pauseInterval = null; // 重置计时器
+        }
+
+        // 重置手动暂停标志
+        window.isPausedManually = false;
+
+        // 保存当前会话 ID
+        const currentSessionId = window.audioSessionId;
+
+        // 播放和暂停的循环函数
+        function playAndPauseLoop() {
+            // 如果会话 ID 不匹配，则退出
+            if (currentSessionId !== window.audioSessionId) {
+                console.log(`[${new Date().toLocaleTimeString()}] Session ID mismatch. Exiting loop.`);
+                return;
+            }
+
+            // 如果手动停止，则退出循环
+            if (window.isPausedManually) {
+                console.log(`[${new Date().toLocaleTimeString()}] Playback manually stopped.`);
+                return;
+            }
+
+            // 检查音频实例是否有效
+            if (!window.audio) {
+                console.error(`[${new Date().toLocaleTimeString()}] Audio instance is null. Exiting loop.`);
+                return;
+            }
+
+            // 开始播放
+            window.audio.play().catch((error) => {
+                console.error(`[${new Date().toLocaleTimeString()}] Error playing audio:`, error);
+            });
+            console.log(`[${new Date().toLocaleTimeString()}] Playing audio for ${window.playDuration}ms`);
+
+            // 播放时间结束后暂停
+            window.pauseInterval = setTimeout(() => {
+                if (currentSessionId !== window.audioSessionId) {
+                    console.log(`[${new Date().toLocaleTimeString()}] Session ID mismatch during pause. Exiting.`);
+                    return;
+                }
+
+                if (!window.audio) {
+                    console.error(`[${new Date().toLocaleTimeString()}] Audio instance is null during pause. Exiting.`);
+                    return;
+                }
+                window.audio.pause(); // 暂停播放
+
+                console.log(`[${new Date().toLocaleTimeString()}] Pausing audio for ${window.pauseDuration}ms`);
+
+                // 暂停时间结束后继续播放
+                window.pauseInterval = setTimeout(() => {
+                    if (currentSessionId !== window.audioSessionId) {
+                        console.log(`[${new Date().toLocaleTimeString()}] Session ID mismatch during resume. Exiting.`);
+                        return;
+                    }
+
+                    if (!window.audio) {
+                        console.error(`[${new Date().toLocaleTimeString()}] Audio instance is null during resume. Exiting.`);
+                        return;
+                    }
+
+                    if (window.audio.currentTime >= window.audio.duration) {
+                        // 如果音频播放结束，重置播放位置
+                        window.audio.currentTime = 0;
+
+                        // 如果循环播放是关闭的，不再继续播放
+                        if (!window.audio.loop) {
+                            console.log(`[${new Date().toLocaleTimeString()}] Looping is disabled. Exiting playback.`);
+                            return;
+                        }
+                        console.log(`[${new Date().toLocaleTimeString()}] Audio ended. Restarting playback.`);
+                    }
+                    playAndPauseLoop(); // 继续播放循环
+                }, window.pauseDuration);
+            }, window.playDuration);
+        }
+
+        // 开始播放循环
+        playAndPauseLoop();
+
+        // 更新按钮状态
+        updateButtonStates();
+    }
+
+    function stopAutoPause() {
+        // 清除计时器
+        if (window.pauseInterval) {
+            clearTimeout(window.pauseInterval);
+            window.pauseInterval = null; // 重置计时器
+        }
+
+        // 停止音频播放
+        if (window.audio) {
+            window.audio.pause();
+        }
+
+        // 设置手动停止标志
+        window.isPausedManually = true;
+
+        console.log(`[${new Date().toLocaleTimeString()}] Auto pause stopped.`);
+
+        // 更新按钮状态
+        updateButtonStates();
+    }
+
+    function toggleReverse() {
+        if (!window.audio) return;
+        let reverseSeconds = parseFloat(document.getElementById("reverseTime").value);
+        window.audio.pause();
+        window.audio.currentTime = Math.max(window.audio.currentTime - reverseSeconds, 0);
+        window.audio.play();
+    }
+
+    function toggleLoop() {
+        if (!window.audio) return;
+        window.isLooping = !window.isLooping;
+        window.audio.loop = window.isLooping;
+
+        // 更新按钮状态
+        updateButtonStates();
+    }
+
+    function normalPlay() {
+        if (!window.audio) return;
+
+        // 停止自动暂停
+        stopAutoPause();
+
+        // 关闭循环播放
+        window.audio.loop = false;
+
+        // 将播放时间设置为 0
+        window.audio.currentTime = 0;
+
+        // 开始播放
+        window.audio.play();
+
+        console.log(`[${new Date().toLocaleTimeString()}] Normal playback started.`);
+        updateButtonStates();
+    }
+
+    // 页面加载时立即初始化音频
+    initializeAudio();
+</script>
+
+<div id="back-card" class="card-content">
+    {{#背面}}
+        <div>{{背面}}</div>
+    {{/背面}}
+</div>
+
+<script>
+    // 停止音频播放并清除实例
+    if (window.audio) {
+        console.log(`[${new Date().toLocaleTimeString()}] Back side detected. Stopping audio.`);
+        window.audio.pause();
+        window.audio.remove();
+        window.audio = null;
+    }
+
+    // 清除计时器
+    if (window.pauseInterval) {
+        clearTimeout(window.pauseInterval);
+        window.pauseInterval = null;
+    }
+</script>
