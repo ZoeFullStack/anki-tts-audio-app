@@ -1,7 +1,7 @@
 #Persistent
 SetTitleMatchMode, 2  ; 允许匹配窗口标题中的部分内容
 
-; Alt+F 提交“好”答案
+; Alt+F 提交"好"答案
 !f::  ; Alt+F
 jsonShowAnswer := "{""action"":""guiShowAnswer"",""version"":6}"
 jsonAnswer := "{""action"":""guiAnswerCard"",""version"":6,""params"":{""ease"":3}}"
@@ -21,8 +21,8 @@ FileDelete, %tempShow%
 FileDelete, %tempAnswer%
 return
 
-; Alt+D 提交“再次”答案
-!d::  ; Alt+D
+; Alt+A 提交"再次"答案
+!a::  ; Alt+A
 jsonShowAnswer := "{""action"":""guiShowAnswer"",""version"":6}"
 jsonAnswer := "{""action"":""guiAnswerCard"",""version"":6,""params"":{""ease"":1}}"
 
@@ -56,8 +56,8 @@ RunWait, C:\Windows\System32\curl.exe -X POST -H "Content-Type: application/json
 FileDelete, %tempShowQuestion%
 return
 
-; Alt+A 显示答案
-!a::  ; Alt+A
+; Alt+D 显示答案
+!d::  ; Alt+D
 jsonShowAnswer := "{""action"":""guiShowAnswer"",""version"":6}"
 
 tempShow := A_Temp . "\anki_show.json"
