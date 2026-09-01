@@ -1,3 +1,4 @@
+import html
 import os
 import time
 
@@ -9,7 +10,7 @@ from config import (
     TTS_ENGINE,
     TTS_LANGUAGE_CONFIG,
 )
-from language_utils import detect_language
+from language_utils import detect_language, strip_html
 from tts_utils import text_to_speech
 
 
@@ -74,7 +75,11 @@ def process_field_pair(note_id: int, fields: dict, source_field: str, target_fie
     返回
     bool: 是否成功生成并更新
     """
-    text_to_convert = fields.get(source_field, {}).get("value", "").strip()
+    # strip_html 去除 HTML 标签，html.unescape 解码 &amp; &nbsp; 等实体
+    # 防止 TTS 读出 HTML 标签或实体字符，导致生成错误/无法播放的音频
+    raw_value = fields.get(source_field, {}).get("value", "")
+    text_to_convert = html.unescape(strip_html(raw_value))
+
     existing_audio = fields.get(target_field, {}).get("value", "").strip()
 
     if not text_to_convert:
