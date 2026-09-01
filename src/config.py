@@ -1,5 +1,5 @@
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
-DECK_NAME = "pte"
+DECK_NAME = "speak"
 
 TTS_SERVICE_URLS = [
     "https://anki.0w0.live/",

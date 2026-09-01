@@ -4,6 +4,8 @@ import asyncio
 import subprocess
 import sys
 
+from language_utils import build_ssml
+
 def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None, voice=None, 
                   aws_access_key=None, aws_secret_key=None, aws_region=None):
     """
@@ -21,18 +23,27 @@ def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None
     # Ensure output directory exists
     os.makedirs(os.path.dirname(os.path.abspath(audio_file_path)), exist_ok=True)
     
+    # [edge only] main.py 传入原始文本 → build_ssml() 将符号转为 SSML break/移除
+    # → Method1 命令行用 list 参数+--ssml，Method2 库直接传 SSML str
+
     # 1. Edge TTS Engine (free, no API key required)
     if engine.lower() == 'edge':
         try:
             # Default Japanese voice
             if voice is None:
                 voice = "ja-JP-NanamiNeural"
-            
+
+            ssml_text = build_ssml(text, voice)
+
             # Method 1: Use command line tool (more reliable)
             try:
-                cmd = f'edge-tts --voice "{voice}" --text "{text}" --write-media "{audio_file_path}"'
-                print(f"Executing command: {cmd}")
-                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                cmd = [
+                    "edge-tts", "--voice", voice,
+                    "--ssml", "--text", ssml_text,
+                    "--write-media", audio_file_path,
+                ]
+                print(f"Executing command: edge-tts --voice {voice} --ssml --text <ssml> --write-media {audio_file_path}")
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
                 print(f"Successfully generated audio using Edge TTS command line: {audio_file_path}")
                 return
             except subprocess.CalledProcessError as e:
@@ -48,9 +59,8 @@ def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None
                     edge_tts = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(edge_tts)
                     
-                    # Use async function to generate speech
                     async def generate_speech():
-                        communicate = edge_tts.Communicate(text, voice)
+                        communicate = edge_tts.Communicate(ssml_text, voice)
                         await communicate.save(audio_file_path)
                     
                     # Run the async function
