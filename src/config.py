@@ -8,10 +8,12 @@ TTS_SERVICE_URLS = [
 AUDIO_FORMAT = "mp3"
 BATCH_SIZE = 50
 CACHE_FILE = "audio_cache.json"
-AUDIO_OUTPUT_DIR = r"C:\Users\Developer\AppData\Roaming\Anki2\User 1\collection.media"
+# 音频通过 AnkiConnect 存入当前用户的媒体目录，无需配置本机路径。
 
 # TTS engine options: 'gtts' (Google TTS, free), 'edge' (Edge TTS, free)
 TTS_ENGINE = "gtts"
+# True：已有音频的字段跳过。手机播不了时改 False 再跑一遍以重新生成。
+SKIP_EXISTING_AUDIO = True
 
 # 多组字段映射：从 source 读取文字，生成语音写入 target
 FIELD_MAPPINGS = [

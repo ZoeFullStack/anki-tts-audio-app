@@ -1,8 +1,31 @@
 from typing import List, Dict
 import requests
-import json
+import base64
+from pathlib import Path
 
-ANKI_CONNECT_URL = "http://127.0.0.1:8765"
+from config import ANKI_CONNECT_URL
+
+
+def store_media_file(audio_file_path: str, filename: str) -> str:
+    """上传音频到当前 Anki 用户的媒体目录，返回实际保存的文件名。"""
+    data = base64.b64encode(Path(audio_file_path).read_bytes()).decode("ascii")
+    response = requests.post(
+        ANKI_CONNECT_URL,
+        json={
+            "action": "storeMediaFile",
+            "version": 6,
+            "params": {"filename": filename, "data": data, "deleteExisting": False},
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    result = response.json()
+    if result.get("error") is not None:
+        raise RuntimeError(f"Failed to store media: {result['error']}")
+    stored_filename = result.get("result")
+    if not isinstance(stored_filename, str) or not stored_filename:
+        raise RuntimeError("AnkiConnect did not return a media filename")
+    return stored_filename
 
 def get_notes(deck_name: str) -> List[int]:
     escaped_deck_name = deck_name.replace('"', r'\"')
@@ -40,9 +63,10 @@ def update_note_field(note_id: int, field_name: str, updated_content: str) -> No
             }
         },
     }
-    response = requests.post(ANKI_CONNECT_URL, json=payload)
+    response = requests.post(ANKI_CONNECT_URL, json=payload, timeout=30)
+    response.raise_for_status()
     result = response.json()
     if result.get("error") is None:
         print(f"Updated note_id={note_id}, field={field_name}, new content={updated_content}")
     else:
-        print(f"Failed to update note_id={note_id}, error={result.get('error')}")
+        raise RuntimeError(f"Failed to update note_id={note_id}, error={result.get('error')}")

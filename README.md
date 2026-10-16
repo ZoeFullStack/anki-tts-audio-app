@@ -36,6 +36,19 @@ anki-tts-audio-app
 ## Configuration
 Before running the application, you may need to configure the `src/config.py` file to set the Anki API URL and the fields used for text and audio.
 
+### 音频存储（Windows / macOS / Linux）
+
+打开 Anki 并安装、启用 AnkiConnect，切换到需要处理的 Anki 用户。
+在 `src/config.py` 中设置 `DECK_NAME` 和 `FIELD_MAPPINGS`；本机默认接口为 `http://127.0.0.1:8765`。
+
+无需设置 `collection.media` 的绝对路径或相对路径。程序先在系统临时目录生成 MP3，
+再通过 AnkiConnect 的 `storeMediaFile` 接口存入当前用户的媒体目录，成功后写入
+`[sound:实际文件名]`，并自动清理临时文件。同名文件不会被覆盖。
+项目目录的相对路径并不等于 Anki 的媒体目录，因此仅把旧路径改成 `./audio` 无法让 Anki 正常读取音频。
+
+已有内容的音频字段仍会跳过，此改动不会自动迁移旧电脑的音频或修复已有的失效引用。
+运行期间请保持同一个 Anki 用户处于打开状态。
+
 ## Usage
 To run the application, execute the following command:
 ```

@@ -4,7 +4,7 @@ import asyncio
 import subprocess
 import sys
 
-from language_utils import build_ssml
+from language_utils import build_ssml, normalize_tts_text
 
 def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None, voice=None, 
                   aws_access_key=None, aws_secret_key=None, aws_region=None):
@@ -20,6 +20,7 @@ def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None
     :param aws_secret_key: AWS secret access key (Amazon engine only - deprecated)
     :param aws_region: AWS region, e.g., 'us-east-1' (Amazon engine only - deprecated)
     """
+    text = normalize_tts_text(text)
     # Ensure output directory exists
     os.makedirs(os.path.dirname(os.path.abspath(audio_file_path)), exist_ok=True)
     

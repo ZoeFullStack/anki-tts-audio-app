@@ -1,16 +1,17 @@
-import html
 import os
 import time
+from tempfile import TemporaryDirectory
 
-from anki_utils import get_note_fields, get_notes, update_note_field
+from anki_utils import get_note_fields, get_notes, store_media_file, update_note_field
+from audio_compat import ensure_mobile_compatible_audio, with_converted_suffix
 from config import (
-    AUDIO_OUTPUT_DIR,
     DECK_NAME,
     FIELD_MAPPINGS,
+    SKIP_EXISTING_AUDIO,
     TTS_ENGINE,
     TTS_LANGUAGE_CONFIG,
 )
-from language_utils import detect_language, strip_html
+from language_utils import detect_language, normalize_tts_text, strip_html
 from tts_utils import text_to_speech
 
 
@@ -75,17 +76,16 @@ def process_field_pair(note_id: int, fields: dict, source_field: str, target_fie
     返回
     bool: 是否成功生成并更新
     """
-    # strip_html 去除 HTML 标签，html.unescape 解码 &amp; &nbsp; 等实体
-    # 防止 TTS 读出 HTML 标签或实体字符，导致生成错误/无法播放的音频
+    # 去除 HTML 标签，并统一实体编码和英文缩写中的不同撇号。
     raw_value = fields.get(source_field, {}).get("value", "")
-    text_to_convert = html.unescape(strip_html(raw_value))
+    text_to_convert = normalize_tts_text(strip_html(raw_value))
 
     existing_audio = fields.get(target_field, {}).get("value", "").strip()
 
     if not text_to_convert:
         return False
 
-    if existing_audio:
+    if existing_audio and SKIP_EXISTING_AUDIO:
         print(
             f"Skipping note ID {note_id} [{source_field}->{target_field}] "
             f"- already has audio: {existing_audio}"
@@ -93,27 +93,42 @@ def process_field_pair(note_id: int, fields: dict, source_field: str, target_fie
         return False
 
     lang = detect_language(text_to_convert)
-    lang_code, voice = get_tts_params(lang)
-    audio_file_name = generate_audio_filename(text_to_convert, lang)
-    audio_file_path = os.path.join(AUDIO_OUTPUT_DIR, audio_file_name)
-
     print(
         f"Processing note ID {note_id} [{source_field}->{target_field}] "
         f"detected={lang}, text={text_to_convert[:30]}"
     )
-
-    text_to_speech(
-        text=text_to_convert,
-        audio_file_path=audio_file_path,
-        lang=lang_code,
-        engine=TTS_ENGINE,
-        voice=voice,
-    )
-
+    audio_file_name = generate_and_store_audio(text_to_convert, lang)
     anki_sound_format = f"[sound:{audio_file_name}]"
     update_note_field(note_id, target_field, anki_sound_format)
     print(f"Updated note ID {note_id} with audio file: {anki_sound_format}")
     return True
+
+
+def generate_and_store_audio(text: str, lang: str) -> str:
+    """
+    生成手机可播放音频并上传到 Anki 媒体库
+
+    参数
+    text: 要朗读的文本
+    lang: 语言代码
+
+    返回
+    str: Anki 媒体文件名
+    """
+    lang_code, voice = get_tts_params(lang)
+    audio_file_name = generate_audio_filename(text, lang)
+    with TemporaryDirectory(prefix="anki-tts-") as temp_dir:
+        audio_file_path = os.path.join(temp_dir, "audio.mp3")
+        text_to_speech(
+            text=text,
+            audio_file_path=audio_file_path,
+            lang=lang_code,
+            engine=TTS_ENGINE,
+            voice=voice,
+        )
+        audio_file_path = ensure_mobile_compatible_audio(audio_file_path)
+        audio_file_name = with_converted_suffix(audio_file_name, audio_file_path)
+        return store_media_file(audio_file_path, audio_file_name)
 
 
 def main():

@@ -1,18 +1,19 @@
 import requests
-from datetime import datetime
 
 # AnkiConnect 地址
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
 
-# 可配置的变量（多个牌组名称）
-DECK_NAMES = ["english",  "japanese"]
+# 在这里设置要处理的牌组名。当前有效牌组是 speak，english/japanese 已不存在。
+DECK_NAMES = ["speak"]
+EASY_EASE = 4
+MIN_EASY_STREAK = 7
 
 # 获取指定牌组中的所有卡片
 def get_cards_by_deck(deck_name):
     payload = {
         "action": "findCards",
         "version": 6,
-        "params": {"query": f"deck:{deck_name}"}
+        "params": {"query": f'deck:"{deck_name}"'}
     }
     response = requests.post(ANKI_CONNECT_URL, json=payload)
     result = response.json()
@@ -54,6 +55,8 @@ def get_card_info(card_ids):
 
 # 使用 areSuspended 方法筛选非暂停状态的卡片
 def filter_non_suspended_cards(card_ids):
+    if not card_ids:
+        return []
     payload = {
         "action": "areSuspended",
         "version": 6,
@@ -73,6 +76,18 @@ def filter_non_suspended_cards(card_ids):
 
 # 将符合条件的卡片设置为暂停状态
 def suspend_cards(card_ids):
+    """
+    暂停指定卡片
+
+    参数
+    card_ids: 卡片 ID 列表
+
+    返回
+    无
+    """
+    if not card_ids:
+        print("no cards to suspend")
+        return
     payload = {
         "action": "suspend",
         "version": 6,
@@ -81,60 +96,69 @@ def suspend_cards(card_ids):
     response = requests.post(ANKI_CONNECT_URL, json=payload)
     result = response.json()
     if result.get("error") is None:
-        print(f"test suspend success CardId: {card_ids}")
+        print(f"suspend success CardId: {card_ids}")
     else:
         print("Error:", result.get("error"))
 
-# 筛选点击 Good 超过 7 次的卡片，并输出 noteId
-def filter_good_cards(deck_name, good_threshold=7):
-    note_ids = get_cards_by_deck(deck_name)
-    card_ids = list(map(int, note_ids))  # 确保 card_ids 是整数列表
-    good_cards = []
 
-    # 获取所有卡片的复习记录
+def count_consecutive_easy(review_list, ease=EASY_EASE):
+    """
+    统计连续选 Easy 的最长次数
+
+    参数
+    review_list: 单张卡片的复习记录
+    ease: Anki 按钮值，4 表示 Easy
+
+    返回
+    int: 最长连续 Easy 次数
+    """
+    review_list.sort(key=lambda x: x["id"])
+    max_streak = 0
+    current_streak = 0
+    for review in review_list:
+        if review.get("ease") == ease:
+            current_streak += 1
+            max_streak = max(max_streak, current_streak)
+        else:
+            current_streak = 0
+    return max_streak
+
+
+def filter_easy_cards(deck_name, min_streak=MIN_EASY_STREAK):
+    """
+    筛选连续选 Easy 达到阈值、且尚未暂停的卡片
+
+    参数
+    deck_name: 牌组名
+    min_streak: 连续 Easy 最少次数
+
+    返回
+    tuple[list, list]: (noteId 列表, cardId 列表)
+    """
+    card_ids = list(map(int, get_cards_by_deck(deck_name)))
+    if not card_ids:
+        print(f"no cards in deck: {deck_name}")
+        return [], []
+    easy_cards = []
     reviews = get_reviews_of_cards(card_ids)
+    for card_id, review_list in reviews.items():
+        streak = count_consecutive_easy(review_list)
+        if streak >= min_streak:
+            easy_cards.append(int(card_id))
+            print(f"match card={card_id} easy_streak={streak}")
 
-    # 遍历复习记录，统计符合条件的 Good 次数
-    for card_id, review_list in reviews.items():  # 遍历字典的键和值
-        # 按时间排序复习记录
-        review_list.sort(key=lambda x: x["id"])
-        good_clicks = 0
-        for i in range(1, len(review_list)):
-            current_review = review_list[i]
-            previous_review = review_list[i - 1]
-
-            # 检查当前和上一次的复习是否都是 Good
-            if current_review["ease"] == 3 and previous_review["ease"] == 3:
-                # 检查是否是不同日期
-                current_date = datetime.fromtimestamp(current_review["id"] / 1000).date()
-                previous_date = datetime.fromtimestamp(previous_review["id"] / 1000).date()
-                if current_date != previous_date:
-                    good_clicks += 1
-
-        # 如果符合条件的 Good 次数超过阈值，添加到结果列表
-        if good_clicks > good_threshold:
-            good_cards.append(int(card_id))  # 添加 cardId 到结果列表
-
-    # 使用 areSuspended 方法检查卡片是否暂停
-    non_suspended_cards = filter_non_suspended_cards(good_cards)
-
-    # 获取这些卡片的详细信息以提取 noteId
+    non_suspended_cards = filter_non_suspended_cards(easy_cards)
     card_info_list = get_card_info(non_suspended_cards)
-    good_notes = [card_info["note"] for card_info in card_info_list]
-
-    return good_notes, non_suspended_cards
+    note_ids = [card_info["note"] for card_info in card_info_list]
+    return note_ids, non_suspended_cards
 
 if __name__ == "__main__":
     for deck_name in DECK_NAMES:
-        print(f"process test: {deck_name}")
-        
-        # 筛选点击 Good 超过 7 次的卡片
-        print("filtering...")
-        good_notes, good_card_ids = filter_good_cards(deck_name, good_threshold=7)
-        print("over 7 times node id:")
-        for note_id in good_notes:
+        print(f"process deck: {deck_name}")
+        print("filtering consecutive Easy(4) >= 7 ...")
+        note_ids, card_ids = filter_easy_cards(deck_name)
+        print("matched note ids:")
+        for note_id in note_ids:
             print(note_id)
-
-        # 将符合条件的卡片设置为暂停状态
         print("suspending cards...")
-        suspend_cards(good_card_ids)
+        suspend_cards(card_ids)

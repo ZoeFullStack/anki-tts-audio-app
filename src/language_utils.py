@@ -1,6 +1,20 @@
+import html
 import re
 
 JAPANESE_PATTERN = re.compile(r"[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]")
+
+
+def normalize_tts_text(text: str) -> str:
+    """统一英文单词内的撇号及 HTML 实体，保留缩写的读法。"""
+    # 兼容编辑器重复编码的 &#39;、&rsquo;、&amp;#39; 等。
+    for _ in range(3):
+        decoded = html.unescape(text)
+        if decoded == text:
+            break
+        text = decoded
+    # 仅处理英文单词内部，避免改动日语标点及引用符号。
+    text = re.sub(r"(?<=[A-Za-z])[‘’ʼ＇`´](?=[A-Za-z])", "'", text)
+    return text.strip()
 
 
 def strip_html(text: str) -> str:
