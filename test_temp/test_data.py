@@ -1,3 +1,5 @@
+# Keep the machine awake with fake typing and mouse moves. Scope: random_typing, random_mouse_move.
+
 import pyautogui
 import time
 import random
@@ -5,6 +7,7 @@ import string
 
 print("Realistic keep-awake script started. Press Ctrl+C to stop.")
 
+# Type and delete 1-3 random letters.
 def random_typing():
     # Type 1–3 random letters
     length = random.randint(1, 3)
@@ -13,6 +16,7 @@ def random_typing():
     for _ in range(len(text)):
         pyautogui.press('backspace')
 
+# Move the mouse to a random screen point.
 def random_mouse_move():
     # Get screen si
     screenWidth, screenHeight = pyautogui.size()

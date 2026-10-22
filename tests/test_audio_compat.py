@@ -1,3 +1,5 @@
+# Tests for mobile audio conversion. Scope: AudioCompatTests.
+
 import sys
 import tempfile
 import unittest
@@ -10,12 +12,14 @@ from tts_utils import text_to_speech
 
 
 class AudioCompatTests(unittest.TestCase):
+    # Check the stored filename suffix follows the converted file.
     def test_suffix_follows_converted_file(self):
         self.assertEqual(
             with_converted_suffix("hello_en_gtts_1_local.mp3", "/tmp/audio.m4a"),
             "hello_en_gtts_1_local.m4a",
         )
 
+    # Check gTTS MP3 is converted to a non-empty m4a.
     def test_gtts_converts_to_playable_m4a(self):
         with tempfile.TemporaryDirectory(prefix="anki-tts-test-") as temp_dir:
             mp3_path = str(Path(temp_dir) / "audio.mp3")

@@ -1,10 +1,12 @@
-# Python 虚拟环境和依赖目录
+# Ignore local secrets, virtualenvs, caches, and generated audio.
+
+# Python virtualenvs and local runtime
 .venv/
 venv/
 env/
 .python-version
 
-# 编译缓存
+# Compiled caches
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -12,7 +14,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# 密钥和本地隐私配置
+# Secrets and local privacy files
 .env
 .env.*
 !.env.example
@@ -22,14 +24,14 @@ credentials.json
 secrets.json
 audio_cache.json
 
-# 编辑器和系统文件
+# Editor and OS files
 .idea/
 .vscode/
 .DS_Store
 *.swp
 Thumbs.db
 
-# 生成的音频和媒体
+# Generated audio and media
 *.mp3
 *.m4a
 *.wav

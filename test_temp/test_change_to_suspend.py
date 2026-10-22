@@ -1,14 +1,18 @@
+# Suspend cards with 7+ consecutive Easy(4) reviews. Scope: get_cards_by_deck, get_reviews_of_cards, get_card_info, filter_non_suspended_cards, suspend_cards, count_consecutive_easy, filter_easy_cards.
+
+import sys
+from pathlib import Path
+
 import requests
 
-# AnkiConnect 地址
-ANKI_CONNECT_URL = "http://127.0.0.1:8765"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from config import ANKI_CONNECT_URL, DECK_NAMES
 
-# 在这里设置要处理的牌组名。当前有效牌组是 speak，english/japanese 已不存在。
-DECK_NAMES = ["speak"]
 EASY_EASE = 4
 MIN_EASY_STREAK = 7
 
-# 获取指定牌组中的所有卡片
+
+# Find card IDs in one deck.
 def get_cards_by_deck(deck_name):
     payload = {
         "action": "findCards",
@@ -23,7 +27,8 @@ def get_cards_by_deck(deck_name):
         print("Error:", result.get("error"))
         return []
 
-# 获取卡片的复习记录
+
+# Fetch review history for a list of cards.
 def get_reviews_of_cards(card_ids):
     payload = {
         "action": "getReviewsOfCards",
@@ -38,7 +43,8 @@ def get_reviews_of_cards(card_ids):
         print("Error:", result.get("error"))
         return {}
 
-# 获取卡片的详细信息，包括 noteId
+
+# Fetch card details including note IDs.
 def get_card_info(card_ids):
     payload = {
         "action": "cardsInfo",
@@ -48,12 +54,13 @@ def get_card_info(card_ids):
     response = requests.post(ANKI_CONNECT_URL, json=payload)
     result = response.json()
     if result.get("error") is None:
-        return result["result"]  # 返回卡片的详细信息列表
+        return result["result"]
     else:
         print("Error:", result.get("error"))
         return []
 
-# 使用 areSuspended 方法筛选非暂停状态的卡片
+
+# Keep only cards that are not already suspended.
 def filter_non_suspended_cards(card_ids):
     if not card_ids:
         return []
@@ -65,7 +72,7 @@ def filter_non_suspended_cards(card_ids):
     response = requests.post(ANKI_CONNECT_URL, json=payload)
     result = response.json()
     if result.get("error") is None:
-        suspended_status = result["result"]  # 返回一个布尔值列表
+        suspended_status = result["result"]
         non_suspended_cards = [
             card_id for card_id, is_suspended in zip(card_ids, suspended_status) if not is_suspended
         ]
@@ -74,17 +81,9 @@ def filter_non_suspended_cards(card_ids):
         print("Error:", result.get("error"))
         return []
 
-# 将符合条件的卡片设置为暂停状态
+
+# Suspend the given cards.
 def suspend_cards(card_ids):
-    """
-    暂停指定卡片
-
-    参数
-    card_ids: 卡片 ID 列表
-
-    返回
-    无
-    """
     if not card_ids:
         print("no cards to suspend")
         return
@@ -101,17 +100,8 @@ def suspend_cards(card_ids):
         print("Error:", result.get("error"))
 
 
+# Return the longest consecutive Easy streak on one card.
 def count_consecutive_easy(review_list, ease=EASY_EASE):
-    """
-    统计连续选 Easy 的最长次数
-
-    参数
-    review_list: 单张卡片的复习记录
-    ease: Anki 按钮值，4 表示 Easy
-
-    返回
-    int: 最长连续 Easy 次数
-    """
     review_list.sort(key=lambda x: x["id"])
     max_streak = 0
     current_streak = 0
@@ -124,17 +114,8 @@ def count_consecutive_easy(review_list, ease=EASY_EASE):
     return max_streak
 
 
+# Find unsuspended cards whose Easy streak meets the threshold.
 def filter_easy_cards(deck_name, min_streak=MIN_EASY_STREAK):
-    """
-    筛选连续选 Easy 达到阈值、且尚未暂停的卡片
-
-    参数
-    deck_name: 牌组名
-    min_streak: 连续 Easy 最少次数
-
-    返回
-    tuple[list, list]: (noteId 列表, cardId 列表)
-    """
     card_ids = list(map(int, get_cards_by_deck(deck_name)))
     if not card_ids:
         print(f"no cards in deck: {deck_name}")

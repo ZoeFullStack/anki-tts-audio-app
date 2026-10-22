@@ -1,5 +1,8 @@
+# Shared Anki/TTS settings used by audio generation and auto-suspend. Scope: constants only.
+
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
-DECK_NAME = "speak"
+# Shared deck list for TTS generation and auto-suspend; supports multiple decks.
+DECK_NAMES = ["speak", "word"]
 
 TTS_SERVICE_URLS = [
     "https://anki.0w0.live/",
@@ -8,20 +11,24 @@ TTS_SERVICE_URLS = [
 AUDIO_FORMAT = "mp3"
 BATCH_SIZE = 50
 CACHE_FILE = "audio_cache.json"
-# 音频通过 AnkiConnect 存入当前用户的媒体目录，无需配置本机路径。
+# Audio is stored via AnkiConnect; no local media path is required.
 
 # TTS engine options: 'gtts' (Google TTS, free), 'edge' (Edge TTS, free)
 TTS_ENGINE = "gtts"
-# True：已有音频的字段跳过。手机播不了时改 False 再跑一遍以重新生成。
+# Skip fields that already have audio. Set False to regenerate for mobile playback.
 SKIP_EXISTING_AUDIO = True
+# gTTS rate-limit handling for large decks.
+TTS_RETRY = 3
+TTS_RETRY_SLEEP = 2
+TTS_REQUEST_SLEEP = 1
 
-# 多组字段映射：从 source 读取文字，生成语音写入 target
+# Map source text fields to target audio fields.
 FIELD_MAPPINGS = [
     {"source": "frontSentence", "target": "frontAudio"},
     {"source": "backMeaning", "target": "backAudio"},
 ]
 
-# 按检测到的语言选择 TTS 参数
+# TTS params selected by detected language.
 TTS_LANGUAGE_CONFIG = {
     "ja": {
         "gtts_lang": "ja",

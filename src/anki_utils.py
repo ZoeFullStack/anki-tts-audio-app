@@ -1,3 +1,5 @@
+# AnkiConnect helpers for notes and media. Scope: store_media_file, get_notes, get_notes_from_decks, get_note_fields, update_note_field.
+
 from typing import List, Dict
 import requests
 import base64
@@ -6,8 +8,8 @@ from pathlib import Path
 from config import ANKI_CONNECT_URL
 
 
+# Upload a local audio file into the current Anki media folder.
 def store_media_file(audio_file_path: str, filename: str) -> str:
-    """上传音频到当前 Anki 用户的媒体目录，返回实际保存的文件名。"""
     data = base64.b64encode(Path(audio_file_path).read_bytes()).decode("ascii")
     response = requests.post(
         ANKI_CONNECT_URL,
@@ -27,6 +29,8 @@ def store_media_file(audio_file_path: str, filename: str) -> str:
         raise RuntimeError("AnkiConnect did not return a media filename")
     return stored_filename
 
+
+# Find note IDs in one deck.
 def get_notes(deck_name: str) -> List[int]:
     escaped_deck_name = deck_name.replace('"', r'\"')
     payload = {
@@ -38,6 +42,23 @@ def get_notes(deck_name: str) -> List[int]:
     result = response.json()
     return result.get("result", [])
 
+
+# Collect unique note IDs from multiple decks.
+def get_notes_from_decks(deck_names: List[str]) -> List[int]:
+    note_ids = []
+    seen = set()
+    for deck_name in deck_names:
+        ids = get_notes(deck_name)
+        print(f"deck={deck_name} notes={len(ids)}")
+        for note_id in ids:
+            if note_id in seen:
+                continue
+            seen.add(note_id)
+            note_ids.append(note_id)
+    return note_ids
+
+
+# Read all fields of one note.
 def get_note_fields(note_id: int) -> Dict:
     payload = {
         "action": "notesInfo",
@@ -50,6 +71,8 @@ def get_note_fields(note_id: int) -> Dict:
         return result["result"][0]["fields"]
     return {}
 
+
+# Write one note field through AnkiConnect.
 def update_note_field(note_id: int, field_name: str, updated_content: str) -> None:
     payload = {
         "action": "updateNoteFields",

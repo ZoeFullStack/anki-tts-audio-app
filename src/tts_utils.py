@@ -1,31 +1,44 @@
+# TTS engines that turn text into an audio file. Scope: save_gtts_with_retry, text_to_speech, play_audio, create_audio_file.
+
 from gtts import gTTS
 import os
 import asyncio
 import subprocess
 import sys
+import time
 
 from language_utils import build_ssml, normalize_tts_text
 
+try:
+    from config import TTS_RETRY, TTS_RETRY_SLEEP
+except ImportError:
+    TTS_RETRY = 3
+    TTS_RETRY_SLEEP = 2
+
+
+# Save gTTS audio and retry when Google returns an empty 200 response.
+def save_gtts_with_retry(text, audio_file_path, lang, tld):
+    last_error = None
+    for attempt in range(1, TTS_RETRY + 1):
+        try:
+            gTTS(text=text, lang=lang, tld=tld).save(audio_file_path)
+            print(f"Successfully generated audio using Google TTS (lang={lang}, tld={tld}): {audio_file_path}")
+            return
+        except Exception as e:
+            last_error = e
+            print(f"gTTS attempt {attempt}/{TTS_RETRY} failed: {e}")
+            if attempt < TTS_RETRY:
+                time.sleep(TTS_RETRY_SLEEP * attempt)
+    raise Exception(f"All TTS engines failed: {last_error}")
+
+# Generate speech with Edge, OpenAI, Amazon, or gTTS and save it to audio_file_path.
 def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None, voice=None, 
                   aws_access_key=None, aws_secret_key=None, aws_region=None):
-    """
-    Convert text to speech using various TTS engines
-    :param text: The text to convert to speech
-    :param audio_file_path: Output audio file path
-    :param lang: Language code (e.g., 'en', 'ja', 'zh-CN'), used for gTTS mode
-    :param engine: TTS engine, options: 'gtts' (Google), 'edge' (free)
-    :param api_key: OpenAI API key, if None tries to get from environment (OpenAI engine only)
-    :param voice: Voice model, used by Edge TTS, different voices available for different engines
-    :param aws_access_key: AWS access key ID (Amazon engine only - deprecated)
-    :param aws_secret_key: AWS secret access key (Amazon engine only - deprecated)
-    :param aws_region: AWS region, e.g., 'us-east-1' (Amazon engine only - deprecated)
-    """
     text = normalize_tts_text(text)
     # Ensure output directory exists
     os.makedirs(os.path.dirname(os.path.abspath(audio_file_path)), exist_ok=True)
     
-    # [edge only] main.py 传入原始文本 → build_ssml() 将符号转为 SSML break/移除
-    # → Method1 命令行用 list 参数+--ssml，Method2 库直接传 SSML str
+    # Edge only: convert text to SSML, then try CLI first and the library next.
 
     # 1. Edge TTS Engine (free, no API key required)
     if engine.lower() == 'edge':
@@ -60,6 +73,7 @@ def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None
                     edge_tts = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(edge_tts)
                     
+                    # Save Edge TTS audio through the async library.
                     async def generate_speech():
                         communicate = edge_tts.Communicate(ssml_text, voice)
                         await communicate.save(audio_file_path)
@@ -190,25 +204,17 @@ def text_to_speech(text, audio_file_path, lang='en', engine='edge', api_key=None
             print("Falling back to gTTS...")
     
     # 4. Google TTS Engine (free, but with limitations)
-    # If previous engines fail or if gTTS is specified
-    try:
-        # Get TLD from parameters if provided, otherwise use 'com'
-        tld = getattr(sys.modules.get('config'), 'GTTS_TLD', 'com') if voice is None else voice
-        
-        # Create gTTS object with specified language and TLD
-        tts = gTTS(text=text, lang=lang, tld=tld)
-        tts.save(audio_file_path)
-        print(f"Successfully generated audio using Google TTS (lang={lang}, tld={tld}): {audio_file_path}")
-    except Exception as e:
-        print(f"Error using Google TTS: {str(e)}")
-        raise Exception("All TTS engines failed")
+    tld = getattr(sys.modules.get('config'), 'GTTS_TLD', 'com') if voice is None else voice
+    save_gtts_with_retry(text, audio_file_path, lang, tld)
 
+# Play a local audio file on Windows.
 def play_audio(audio_file_path):
     if os.path.exists(audio_file_path):
         os.system(f'start {audio_file_path}')  # For Windows
     else:
         print(f"Audio file {audio_file_path} does not exist.")
 
+# Create an audio_files/*.mp3 from text.
 def create_audio_file(text, lang='en'):
     audio_file_name = f"{text[:10].replace(' ', '_')}.mp3"  # Create a unique file name
     audio_file_path = os.path.join('audio_files', audio_file_name)
